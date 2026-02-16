@@ -2,7 +2,7 @@
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
-    QScrollArea, QProgressBar
+    QScrollArea, QProgressBar, QComboBox, QSlider, QSpinBox
 )
 from PyQt6.QtCore import Qt
 
@@ -82,6 +82,9 @@ class RankPredictorPage(QWidget):
         # Rank comparison selector would go here
         # For now, just show comparison to predicted rank
         self._add_rank_comparison(prediction['overall_prediction'])
+
+        # What If Simulator
+        self._add_what_if_simulator(prediction)
 
         self.layout_main.addStretch()
 
@@ -554,3 +557,357 @@ class RankPredictorPage(QWidget):
             layout.addLayout(row)
 
         self.layout_main.insertWidget(5, card)
+
+    def _add_what_if_simulator(self, prediction: dict):
+        """Add What If simulator: target rank, games needed, stat sliders."""
+        if not self.predictor:
+            return
+
+        player_stats = prediction.get('player_stats', {})
+        if not player_stats:
+            return
+
+        card = QFrame()
+        card.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['bg_card']};
+                border: 1px solid {COLORS['gold_dark']};
+                border-radius: 8px;
+            }}
+        """)
+
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+
+        title = QLabel("What If Simulator")
+        title.setStyleSheet(f"color: {COLORS['gold']}; font-size: 20px; font-weight: bold;")
+        layout.addWidget(title)
+
+        desc = QLabel("See how many games you'd need to reach a target rank, "
+                       "and how improving specific stats would change your prediction")
+        desc.setStyleSheet(f"color: {COLORS['text_dim']}; font-size: 12px;")
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+
+        # ---- Target Rank Selector ----
+        target_row = QHBoxLayout()
+        target_label = QLabel("Target Rank:")
+        target_label.setStyleSheet(f"color: {COLORS['text']}; font-weight: bold;")
+        target_row.addWidget(target_label)
+
+        self.target_combo = QComboBox()
+        self.target_combo.setFixedWidth(160)
+        for rank in RANK_ORDER:
+            self.target_combo.addItem(rank)
+
+        # Default to one rank above current prediction
+        current_pred = prediction.get('overall_prediction', 'Gold')
+        if current_pred in RANK_ORDER:
+            idx = RANK_ORDER.index(current_pred)
+            target_idx = min(idx + 1, len(RANK_ORDER) - 1)
+            self.target_combo.setCurrentIndex(target_idx)
+
+        self.target_combo.currentIndexChanged.connect(self._on_target_changed)
+        target_row.addWidget(self.target_combo)
+        target_row.addStretch()
+        layout.addLayout(target_row)
+
+        # Games needed display
+        self.games_needed_frame = QFrame()
+        self.games_needed_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['bg_dark']};
+                border-radius: 6px;
+                padding: 12px;
+            }}
+        """)
+        games_layout = QVBoxLayout(self.games_needed_frame)
+        games_layout.setSpacing(4)
+
+        self.games_needed_label = QLabel("")
+        self.games_needed_label.setStyleSheet(f"color: {COLORS['text']}; font-size: 14px; font-weight: bold;")
+        games_layout.addWidget(self.games_needed_label)
+
+        self.games_detail_label = QLabel("")
+        self.games_detail_label.setStyleSheet(f"color: {COLORS['text_dim']}; font-size: 11px;")
+        self.games_detail_label.setWordWrap(True)
+        games_layout.addWidget(self.games_detail_label)
+
+        layout.addWidget(self.games_needed_frame)
+
+        # ---- Stat Sliders ----
+        slider_title = QLabel("Stat Adjustments")
+        slider_title.setStyleSheet(f"color: {COLORS['text']}; font-size: 14px; font-weight: bold;")
+        layout.addWidget(slider_title)
+
+        slider_desc = QLabel("Drag sliders to see how improving stats would change your predicted rank")
+        slider_desc.setStyleSheet(f"color: {COLORS['text_dim']}; font-size: 11px;")
+        layout.addWidget(slider_desc)
+
+        self._sliders = {}
+        self._slider_labels = {}
+        self._current_player_stats = player_stats
+
+        stat_configs = [
+            ('kda', 'KDA', 0.5, 6.0, 2),
+            ('cs_per_min', 'CS/min', 2.0, 10.0, 1),
+            ('vision_score_per_min', 'Vision/min', 0.2, 3.0, 2),
+            ('damage_per_min', 'Damage/min', 150, 900, 0),
+            ('gold_per_min', 'Gold/min', 180, 550, 0),
+            ('kill_participation', 'KP %', 25, 75, 0),
+        ]
+
+        for stat_key, stat_name, min_val, max_val, decimals in stat_configs:
+            current_val = player_stats.get(stat_key, 0)
+            if current_val == 0:
+                continue
+
+            row = QHBoxLayout()
+            row.setSpacing(8)
+
+            name_lbl = QLabel(stat_name)
+            name_lbl.setFixedWidth(80)
+            name_lbl.setStyleSheet(f"color: {COLORS['text_dim']}; font-size: 12px;")
+            row.addWidget(name_lbl)
+
+            # Scale factor for slider (sliders only support ints)
+            scale = 10 ** decimals
+            slider = QSlider(Qt.Orientation.Horizontal)
+            slider.setMinimum(int(min_val * scale))
+            slider.setMaximum(int(max_val * scale))
+            slider.setValue(int(current_val * scale))
+            slider.setFixedWidth(200)
+            slider.setStyleSheet(f"""
+                QSlider::groove:horizontal {{
+                    background: {COLORS['border']};
+                    height: 6px;
+                    border-radius: 3px;
+                }}
+                QSlider::handle:horizontal {{
+                    background: {COLORS['gold']};
+                    width: 14px;
+                    height: 14px;
+                    margin: -4px 0;
+                    border-radius: 7px;
+                }}
+                QSlider::sub-page:horizontal {{
+                    background: {COLORS['gold_dark']};
+                    border-radius: 3px;
+                }}
+            """)
+            row.addWidget(slider)
+
+            val_label = QLabel(self._format_slider_value(current_val, decimals))
+            val_label.setFixedWidth(60)
+            val_label.setStyleSheet(f"color: {COLORS['text']}; font-weight: bold; font-size: 12px;")
+            row.addWidget(val_label)
+
+            # Store metadata
+            self._sliders[stat_key] = (slider, scale, decimals)
+            self._slider_labels[stat_key] = val_label
+
+            slider.valueChanged.connect(lambda v, k=stat_key: self._on_slider_changed(k))
+
+            row.addStretch()
+            layout.addLayout(row)
+
+        # Reset button
+        reset_row = QHBoxLayout()
+        from PyQt6.QtWidgets import QPushButton
+        reset_btn = QPushButton("Reset to Actual Stats")
+        reset_btn.setFixedWidth(160)
+        reset_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['bg_dark']};
+                color: {COLORS['text_dim']};
+                padding: 6px 16px;
+                border-radius: 4px;
+                border: 1px solid {COLORS['border']};
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['border']};
+                color: {COLORS['text']};
+            }}
+        """)
+        reset_btn.clicked.connect(self._on_reset_sliders)
+        reset_row.addWidget(reset_btn)
+        reset_row.addStretch()
+        layout.addLayout(reset_row)
+
+        # Hypothetical prediction result
+        self.hypo_result_frame = QFrame()
+        self.hypo_result_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['bg_dark']};
+                border-radius: 6px;
+                border-left: 3px solid {COLORS['gold']};
+                padding: 12px;
+            }}
+        """)
+        hypo_layout = QVBoxLayout(self.hypo_result_frame)
+        hypo_layout.setSpacing(4)
+
+        self.hypo_rank_label = QLabel("")
+        self.hypo_rank_label.setStyleSheet(f"color: {COLORS['gold']}; font-size: 16px; font-weight: bold;")
+        hypo_layout.addWidget(self.hypo_rank_label)
+
+        self.hypo_detail_label = QLabel("")
+        self.hypo_detail_label.setStyleSheet(f"color: {COLORS['text_dim']}; font-size: 11px;")
+        self.hypo_detail_label.setWordWrap(True)
+        hypo_layout.addWidget(self.hypo_detail_label)
+
+        layout.addWidget(self.hypo_result_frame)
+
+        self.layout_main.addWidget(card)
+
+        # Trigger initial calculation
+        self._update_games_needed()
+        self._update_hypothetical_prediction()
+
+    def _format_slider_value(self, value: float, decimals: int) -> str:
+        if decimals == 0:
+            return str(int(value))
+        return f"{value:.{decimals}f}"
+
+    def _on_target_changed(self, _index: int):
+        self._update_games_needed()
+
+    def _on_slider_changed(self, stat_key: str):
+        slider, scale, decimals = self._sliders[stat_key]
+        value = slider.value() / scale
+        self._slider_labels[stat_key].setText(self._format_slider_value(value, decimals))
+        self._update_hypothetical_prediction()
+
+    def _on_reset_sliders(self):
+        for stat_key, (slider, scale, decimals) in self._sliders.items():
+            current_val = self._current_player_stats.get(stat_key, 0)
+            slider.blockSignals(True)
+            slider.setValue(int(current_val * scale))
+            slider.blockSignals(False)
+            self._slider_labels[stat_key].setText(self._format_slider_value(current_val, decimals))
+        self._update_hypothetical_prediction()
+
+    def _update_games_needed(self):
+        """Estimate games needed to reach target rank."""
+        if not self.predictor:
+            return
+
+        target_rank = self.target_combo.currentText()
+        current_pred = self.predictor.get_rank_prediction().get('overall_prediction', 'Unknown')
+
+        if current_pred not in RANK_ORDER or target_rank not in RANK_ORDER:
+            self.games_needed_label.setText("Cannot estimate")
+            self.games_detail_label.setText("")
+            return
+
+        current_idx = RANK_ORDER.index(current_pred)
+        target_idx = RANK_ORDER.index(target_rank)
+
+        if target_idx <= current_idx:
+            self.games_needed_label.setText("You're already there!")
+            self.games_detail_label.setText(
+                f"Your current performance matches {current_pred} level. "
+                f"Target {target_rank} is at or below your current performance."
+            )
+            return
+
+        # Estimate: each rank tier requires ~50-80 games at 52-55% WR
+        # Using LP model: ~20 LP per win, ~15 LP per loss at 53% WR
+        # 4 divisions per rank, 100 LP per division = 400 LP per rank
+        # Net LP per game at 53% WR: 0.53*20 - 0.47*15 = 10.6 - 7.05 = 3.55 LP/game
+        # Games per rank: 400 / 3.55 ≈ 113 games
+        # But we account for player WR from match history
+        total_games = len(self.predictor.matches)
+        wins = sum(1 for m in self.predictor.matches if m.get('win'))
+        wr = wins / max(total_games, 1)
+        wr = max(wr, 0.45)  # Floor at 45% to avoid extreme numbers
+
+        lp_per_win = 20
+        lp_per_loss = 15
+        net_lp_per_game = wr * lp_per_win - (1 - wr) * lp_per_loss
+
+        if net_lp_per_game <= 0:
+            self.games_needed_label.setText("Negative LP gain")
+            self.games_detail_label.setText(
+                f"At {wr*100:.0f}% WR, you're losing more LP than gaining. "
+                f"Focus on improving win rate above 50% first."
+            )
+            return
+
+        ranks_to_climb = target_idx - current_idx
+        lp_needed = ranks_to_climb * 400  # 4 divisions * 100 LP each
+        games_needed = int(lp_needed / net_lp_per_game)
+
+        # Estimate time
+        avg_games_per_day = total_games / max(30, 1)  # Rough: assume data spans ~30 days
+        if avg_games_per_day > 0:
+            days_needed = int(games_needed / max(avg_games_per_day, 0.5))
+            time_str = f" (~{days_needed} days at your current pace)"
+        else:
+            time_str = ""
+
+        self.games_needed_label.setText(f"~{games_needed} games to reach {target_rank}")
+        self.games_detail_label.setText(
+            f"Based on your {wr*100:.0f}% win rate ({wins}W-{total_games-wins}L), "
+            f"net {net_lp_per_game:.1f} LP/game. "
+            f"{ranks_to_climb} rank tier{'s' if ranks_to_climb > 1 else ''} to climb "
+            f"(~{lp_needed} LP needed){time_str}"
+        )
+
+    def _update_hypothetical_prediction(self):
+        """Re-run rank prediction with slider-adjusted stats."""
+        if not self.predictor:
+            return
+
+        # Build hypothetical stats from slider values
+        hypo_stats = {}
+        for stat_key, (slider, scale, _decimals) in self._sliders.items():
+            hypo_stats[stat_key] = slider.value() / scale
+
+        # Predict rank for each hypothetical stat
+        stat_weights = {
+            'kda': 2.0, 'damage_per_min': 1.5, 'gold_per_min': 1.5,
+            'kill_participation': 1.3, 'vision_score_per_min': 1.2, 'cs_per_min': 1.0,
+        }
+
+        weighted_sum = 0.0
+        total_weight = 0.0
+        per_stat = []
+
+        for stat_key, value in hypo_stats.items():
+            if value == 0 or (stat_key == 'cs_per_min' and value < 1.0):
+                continue
+            predicted = self.predictor.predict_rank_for_stat(stat_key, value)
+            if predicted in RANK_ORDER:
+                rank_idx = RANK_ORDER.index(predicted)
+                weight = stat_weights.get(stat_key, 1.0)
+                weighted_sum += rank_idx * weight
+                total_weight += weight
+                per_stat.append(f"{self.predictor._format_stat_name(stat_key)}: {predicted}")
+
+        if total_weight > 0:
+            avg_idx = int(round(weighted_sum / total_weight))
+            avg_idx = max(0, min(avg_idx, len(RANK_ORDER) - 1))
+            hypo_rank = RANK_ORDER[avg_idx]
+        else:
+            hypo_rank = 'Unknown'
+
+        # Compare to actual prediction
+        actual = self.predictor.get_rank_prediction().get('overall_prediction', 'Unknown')
+
+        rank_color = self._get_rank_color(hypo_rank)
+        if hypo_rank == actual:
+            change_text = "Same as current prediction"
+        elif hypo_rank in RANK_ORDER and actual in RANK_ORDER:
+            diff = RANK_ORDER.index(hypo_rank) - RANK_ORDER.index(actual)
+            if diff > 0:
+                change_text = f"+{diff} rank tier{'s' if diff > 1 else ''} above current prediction ({actual})"
+            else:
+                change_text = f"{diff} rank tier{'s' if abs(diff) > 1 else ''} below current prediction ({actual})"
+        else:
+            change_text = ""
+
+        self.hypo_rank_label.setText(f"Hypothetical Rank: {hypo_rank}")
+        self.hypo_rank_label.setStyleSheet(f"color: {rank_color}; font-size: 16px; font-weight: bold;")
+        self.hypo_detail_label.setText(change_text)

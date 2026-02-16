@@ -93,8 +93,8 @@ class LCUApi:
 
         return None
 
-    def _make_request(self, endpoint: str, method: str = 'GET', data: Optional[Dict] = None) -> Optional[Dict]:
-        """Make request to LCU API"""
+    def _make_request(self, endpoint: str, method: str = 'GET', data: Optional[Dict] = None):
+        """Make request to LCU API. Returns parsed JSON (dict, list, or str)."""
         if not self.base_url or not self.headers:
             if not self.connect():
                 return None
@@ -142,10 +142,78 @@ class LCUApi:
         if not session:
             return None
 
+        # Extract bans from actions
+        bans = []
+        for action_group in session.get('actions', []):
+            for action in action_group:
+                if action.get('type') == 'ban' and action.get('completed'):
+                    bans.append({
+                        'champion_id': action.get('championId', 0),
+                        'is_ally': action.get('isAllyAction', False),
+                    })
+
         return {
             'my_team': [action for action in session.get('myTeam', [])],
             'their_team': [action for action in session.get('theirTeam', [])],
             'local_player_cell_id': session.get('localPlayerCellId'),
             'timer': session.get('timer', {}),
-            'phase': session.get('timer', {}).get('phase', 'Unknown')
+            'phase': session.get('timer', {}).get('phase', 'Unknown'),
+            'bans': bans,
+        }
+
+    def get_gameflow_phase(self) -> Optional[str]:
+        """Get current gameflow phase.
+
+        Returns phase string: None, Lobby, Matchmaking, ReadyCheck,
+        ChampSelect, InProgress, WaitingForStats, EndOfGame, etc.
+        """
+        result = self._make_request('/lol-gameflow/v1/gameflow-phase')
+        # This endpoint returns a plain string, not JSON object
+        if isinstance(result, str):
+            return result
+        return None
+
+    def get_summoner_by_id(self, summoner_id: int) -> Optional[Dict]:
+        """Get summoner info by summoner ID (local LCU call, no API key needed)."""
+        return self._make_request(f'/lol-summoner/v1/summoners/{summoner_id}')
+
+    def get_active_game_data(self) -> Optional[Dict]:
+        """Get active game session data with all 10 players.
+
+        Returns gameData with teamOne/teamTwo arrays containing
+        summonerName, championId, puuid, selectedPosition.
+        """
+        session = self._make_request('/lol-gameflow/v1/session')
+        if not session:
+            return None
+
+        game_data = session.get('gameData', {})
+        if not game_data:
+            return None
+
+        team_one = []
+        for p in game_data.get('teamOne', []):
+            team_one.append({
+                'summoner_name': p.get('summonerName', ''),
+                'champion_id': p.get('championId', 0),
+                'puuid': p.get('puuid', ''),
+                'selected_position': p.get('selectedPosition', ''),
+                'summoner_id': p.get('summonerId', 0),
+            })
+
+        team_two = []
+        for p in game_data.get('teamTwo', []):
+            team_two.append({
+                'summoner_name': p.get('summonerName', ''),
+                'champion_id': p.get('championId', 0),
+                'puuid': p.get('puuid', ''),
+                'selected_position': p.get('selectedPosition', ''),
+                'summoner_id': p.get('summonerId', 0),
+            })
+
+        return {
+            'team_one': team_one,
+            'team_two': team_two,
+            'game_id': game_data.get('gameId'),
+            'queue': game_data.get('queue', {}),
         }

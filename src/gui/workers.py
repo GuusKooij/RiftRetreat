@@ -53,6 +53,74 @@ class FetchMatchesWorker(QThread):
         self.finished.emit(True)
 
 
+class ScoutingWorker(QThread):
+    """Worker thread for fetching player ranks during in-game via Riot API."""
+    player_ready = pyqtSignal(str, dict)  # puuid, rank_data
+    finished = pyqtSignal(dict)           # all results {puuid: rank_data}
+    error = pyqtSignal(str)
+
+    def __init__(self, riot_api, players: list[dict]):
+        """
+        Args:
+            riot_api: RiotAPI instance
+            players: list of dicts with 'puuid' and 'summoner_name' keys
+        """
+        super().__init__()
+        self.api = riot_api
+        self.players = players
+        self._cancelled = False
+
+    def cancel(self):
+        self._cancelled = True
+
+    def run(self):
+        results = {}
+        for player in self.players:
+            if self._cancelled:
+                break
+
+            puuid = player.get('puuid', '')
+            if not puuid:
+                continue
+
+            try:
+                entries = self.api.get_league_entries_by_puuid(puuid)
+                rank_data = {'summoner_name': player.get('summoner_name', '')}
+
+                if entries:
+                    # Find solo queue entry
+                    for entry in entries:
+                        if entry.get('queueType') == 'RANKED_SOLO_5x5':
+                            rank_data.update({
+                                'tier': entry.get('tier', ''),
+                                'rank': entry.get('rank', ''),
+                                'lp': entry.get('leaguePoints', 0),
+                                'wins': entry.get('wins', 0),
+                                'losses': entry.get('losses', 0),
+                            })
+                            break
+
+                if 'tier' not in rank_data:
+                    rank_data['tier'] = ''
+                    rank_data['rank'] = ''
+                    rank_data['lp'] = 0
+                    rank_data['wins'] = 0
+                    rank_data['losses'] = 0
+
+                # Calculate WR
+                total = rank_data['wins'] + rank_data['losses']
+                rank_data['winrate'] = round(rank_data['wins'] / max(total, 1) * 100, 1) if total else 0
+                rank_data['total_games'] = total
+
+                results[puuid] = rank_data
+                self.player_ready.emit(puuid, rank_data)
+
+            except Exception as e:
+                print(f"Scouting error for {player.get('summoner_name', '?')}: {e}")
+
+        self.finished.emit(results)
+
+
 class AnalyticsWorker(QThread):
     """Worker thread for creating all analytics objects."""
     progress = pyqtSignal(int, int, str)  # current, total, message

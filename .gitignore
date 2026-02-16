@@ -54,6 +54,7 @@ dist/
 
 # User data (local only)
 data/
+!data/.gitkeep
 
 # Development/testing files (not needed in published repo)
 api_check.py

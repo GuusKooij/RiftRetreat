@@ -22,6 +22,10 @@ from src.gui.pages.nuzlocke import NuzlockePage
 from src.gui.pages.league_play import LeaguePlayPage
 from src.gui.pages.rank_predictor import RankPredictorPage
 from src.gui.pages.stat_cards import StatCardsPage
+from src.gui.pages.kryptonite import KryptonitePage
+from src.gui.pages.item_builds import ItemBuildsPage
+from src.gui.pages.friend_compare import FriendComparePage
+from src.gui.pages.coaching_report import CoachingReportPage
 
 from src.data.data_manager import DataManager
 
@@ -195,6 +199,10 @@ class MainWindow(QMainWindow):
         self.league_play_page = LeaguePlayPage()
         self.rank_predictor_page = RankPredictorPage()
         self.stat_cards_page = StatCardsPage()
+        self.kryptonite_page = KryptonitePage()
+        self.item_builds_page = ItemBuildsPage()
+        self.friend_compare_page = FriendComparePage()
+        self.coaching_report_page = CoachingReportPage()
         self.settings_page = SettingsPage(self._app_settings)
 
         self.settings_page.on_refresh = self._on_refresh
@@ -268,7 +276,11 @@ class MainWindow(QMainWindow):
             ("🎮 LeaguePlay", 7),
             ("🏅 Rank Predictor", 8),
             ("📸 Stat Cards", 9),
-            ("⚙️ Settings", 10),
+            ("🛡️ Kryptonite", 10),
+            ("🔧 Item Builds", 11),
+            ("👥 Friend Compare", 12),
+            ("📋 Coaching Report", 13),
+            ("⚙️ Settings", 14),
         ]
 
         for name, index in pages:
@@ -282,7 +294,7 @@ class MainWindow(QMainWindow):
         sidebar_layout.addStretch()
 
         # Version
-        version = QLabel("v1.0.0")
+        version = QLabel("v1.1.0")
         version.setStyleSheet(f"color: {COLORS['text_dim']}; font-size: 10px; padding: 12px; background: transparent;")
         sidebar_layout.addWidget(version)
 
@@ -300,6 +312,10 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.league_play_page)
         self.stack.addWidget(self.rank_predictor_page)
         self.stack.addWidget(self.stat_cards_page)
+        self.stack.addWidget(self.kryptonite_page)
+        self.stack.addWidget(self.item_builds_page)
+        self.stack.addWidget(self.friend_compare_page)
+        self.stack.addWidget(self.coaching_report_page)
         self.stack.addWidget(self.settings_page)
 
         main_layout.addWidget(self.stack)
@@ -324,7 +340,7 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(100, self._refresh_pages)
         else:
             # No data — switch to settings and prompt refresh
-            self._switch_page(10)
+            self._switch_page(14)
 
     def _refresh_pages(self):
         """Refresh all page content with current data."""
@@ -352,7 +368,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, '_loading_dialog'):
             self._loading_dialog.close()
         QMessageBox.critical(self, "Analytics Error", f"Failed to process data:\n\n{error_msg}")
-        self._switch_page(10)
+        self._switch_page(14)
 
     def _on_analytics_finished(self, analyzers: dict):
         """Handle analytics completion and update pages."""
@@ -404,7 +420,10 @@ class MainWindow(QMainWindow):
         champ_analyzer = self._pending_analyzers['champ_analyzer']
         challenge_analyzer = self._pending_analyzers['challenge_analyzer']
 
-        self.live_game_page.set_analyzers(challenge_analyzer, champ_analyzer, self.dm.dd)
+        self.live_game_page.set_analyzers(
+            challenge_analyzer, champ_analyzer, self.dm.dd,
+            stats_analyzer=stats, riot_api=self.dm.api, matches=self.dm.matches
+        )
         self.nuzlocke_page.update_data(self.dm.matches, data_dragon=self.dm.dd)
         self.league_play_page.set_data_dragon(self.dm.dd)
 
@@ -417,6 +436,18 @@ class MainWindow(QMainWindow):
         season_matches = self._pending_analyzers['season_matches']
         self.rank_predictor_page.update_data(season_matches, current_rank=current_rank)
         self.stat_cards_page.update_data(stats, tilt, champ_analyzer, matches=self.dm.matches, data_dragon=self.dm.dd)
+
+        # New v1.1.0 pages
+        self.kryptonite_page.update_data(self.dm.matches, data_dragon=self.dm.dd)
+        self.item_builds_page.update_data(self.dm.matches, data_dragon=self.dm.dd)
+        self.coaching_report_page.update_data(
+            self.dm.matches, stats, tilt, champ_analyzer,
+            current_rank=current_rank, data_dragon=self.dm.dd
+        )
+
+        # Friend compare: pass riot_api and user's ranked entries
+        user_name = self.dm.profile.get('gameName', 'You') if self.dm.profile else 'You'
+        self.friend_compare_page.set_data(self.dm.api, self.dm.ranked_stats, user_name=user_name)
 
         self.settings_page.update_stats(
             self.dm.profile,
