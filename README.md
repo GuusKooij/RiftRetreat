@@ -2,7 +2,7 @@
 
 **RiftRetreat** is a comprehensive League of Legends companion desktop application that provides in-depth analytics, performance insights, champion recommendations, challenge tracking, and performance monitoring for your ranked journey.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.0.1-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
