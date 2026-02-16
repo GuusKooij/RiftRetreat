@@ -1,0 +1,17 @@
+# Simple Solution: Host ZIP on Google Drive/Dropbox
+
+Since the ZIP is 46MB (too large for GitHub web upload limit of 25MB), here are your options:
+
+## EASIEST: Use Google Drive
+1. Upload RiftRetreat-v1.0.0-windows.zip to Google Drive
+2. Right-click → Share → Change to "Anyone with the link"
+3. Copy the share link
+4. On GitHub release page, paste the link in the description instead of uploading
+
+## Alternative: Split into smaller files
+Or we can compress it better to get under 25MB.
+
+## Alternative: Upload via Git (requires setup)
+GitHub allows up to 100MB via git command line (not web).
+
+Let me know which you prefer!

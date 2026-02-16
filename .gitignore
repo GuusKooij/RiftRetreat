@@ -1,0 +1,79 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment variables
+.env
+config.ini
+
+# Cache
+cache/
+*.db
+*.sqlite
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# PyInstaller build artifacts
+*.spec
+build/
+dist/
+
+# User data (local only)
+data/
+
+# Development/testing files (not needed in published repo)
+api_check.py
+example.py
+encode_api_key.py
+create_app_icon.py
+create_icon_ico.py
+build_exe.py
+fetch_ranked_season.py
+API_KEY_SETUP.md
+PRODUCTION_KEY_SETUP.md
+FINAL_BUILD_NOTES.md
+FINAL_SETUP_SUMMARY.md
+GITHUB_SETUP.txt
+READY_TO_PUBLISH.md
+COMPLETED_FEATURES.md
+DISTRIBUTION_GUIDE.md
+nuzlocke_run_*.html
+ranked_matches_season.json
+nul
+
+# Claude Code workspace
+.claude/
