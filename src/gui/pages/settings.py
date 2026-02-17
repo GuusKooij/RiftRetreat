@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 
-from config import RIOT_REGIONS, RIOT_API_KEY
+from config import RIOT_REGIONS, RIOT_API_KEY, APP_VERSION
 from src.gui.theme import COLORS
 
 
@@ -146,7 +146,7 @@ class SettingsPage(QWidget):
         app_info = QLabel(
             "<b>RiftRetreat</b><br>"
             "League of Legends Companion App<br><br>"
-            "Version 1.0.0<br><br>"
+            f"Version {APP_VERSION}<br><br>"
             "<i>© 2026 Treatey (Retreat#EUW)<br>"
             "All rights reserved.</i><br><br>"
             "RiftRetreat is an independent tool and is not affiliated with,<br>"
@@ -161,7 +161,7 @@ class SettingsPage(QWidget):
 
         # GitHub link
         github_link = QLabel(
-            "<a href='https://github.com/yourusername/riftretreat' style='color: " + COLORS['blue'] + ";'>"
+            "<a href='https://github.com/GuusKooij/RiftRetreat' style='color: " + COLORS['blue'] + ";'>"
             "🔗 View on GitHub</a>"
         )
         github_link.setStyleSheet(f"font-size: 12px; border: none;")

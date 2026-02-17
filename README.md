@@ -2,7 +2,7 @@
 
 **RiftRetreat** is a comprehensive League of Legends companion desktop application that provides in-depth analytics, performance insights, champion recommendations, challenge tracking, and performance monitoring for your ranked journey.
 
-![Version](https://img.shields.io/badge/version-1.0.1-blue)
+![Version](https://img.shields.io/badge/version-1.1.0-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -47,10 +47,35 @@
 - 6 card types: Overall Stats, Best Champion, Win Rate, Nuzlocke, Personal Records, Custom
 - **RiftRetreat Branding**: Professional © watermark
 
-### 🎮 Live Game Tools
-- **Champion Select Detection**: Real-time detection when you're in champion select
-- **Pre-Game Scouting**: Look up teammates and enemies
-- **Game Plan Panel**: Shows relevant challenge tips for your selected champion
+### 🎮 Live Game Intel
+- **Champion Select View**: Champion icons, personal stats on your pick, enemy matchup history, ban suggestions, counter-pick recommendations, and team comp analysis (AD/AP balance, engage count)
+- **In-Game View**: All 10 players with ranks loaded progressively via scouting, win prediction percentage, lane matchup card, and role-specific tips
+- **Phase Detection**: Automatically switches between idle, champion select, and in-game views
+
+### 🛡️ Kryptonite
+- **Enemy Matchup Analysis**: Worst/best matchups with win rates and game counts
+- **Suggested Bans**: Priority-scored ban recommendations based on your matchup history
+- **Per-Role Breakdowns**: See your kryptonite champions for each role
+- **Recurring Opponents**: Track players you face repeatedly with W-L records
+
+### 🔧 Item Builds
+- **Core Item Win Rates**: Per-champion analysis of which item combinations win the most
+- **First Item Comparison**: See which first items perform best on each champion
+- **Boots Analysis**: Win rates by boots choice with DataDragon item icons
+
+### 👥 Friend Compare
+- **Side-by-Side Comparison**: Enter any player's Riot ID to compare ranks, win rates, and records
+- **Queue Breakdown**: Compare Solo/Duo and Flex stats separately
+
+### 📋 Coaching Report
+- **Personalized Improvement Areas**: Identifies your weakest stats and suggests focus areas
+- **Tilt Assessment**: Optimal session length, worst loss streak times
+- **Vision & Champion Pool Analysis**: Detailed breakdowns with actionable advice
+- **HTML Export**: Full coaching report exportable to browser
+
+### 🔮 What If Simulator
+- **Target Rank Calculator**: Estimate games needed to reach a target rank based on your current win rate
+- **Stat Sliders**: Adjust KDA, CS/min, Vision, Damage, Gold, KP to see how improvements affect your predicted rank
 
 ### 📉 Ranked Climb Tracker
 - **LP History**: Track LP over time with visual graph

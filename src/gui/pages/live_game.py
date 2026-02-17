@@ -83,7 +83,17 @@ class LiveGamePage(QWidget):
     def _setup_polling(self):
         self.poll_timer = QTimer()
         self.poll_timer.timeout.connect(self._poll_lcu)
-        self.poll_timer.start(3000)
+        # Don't start immediately — only poll when page is visible
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not self.poll_timer.isActive():
+            self._poll_lcu()  # Immediate first poll
+            self.poll_timer.start(3000)
+
+    def hideEvent(self, event):
+        super().hideEvent(event)
+        self.poll_timer.stop()
 
     def set_analyzers(self, challenge_analyzer, champion_analyzer, data_dragon,
                       stats_analyzer=None, riot_api=None, matches=None):
@@ -183,10 +193,10 @@ class LiveGamePage(QWidget):
         elif phase == 'InProgress':
             if self._current_phase != 'InProgress':
                 self._current_phase = 'InProgress'
-                self._start_in_game_scouting()
+                self._scouting_results = {}
             self.status_label.setText("Game In Progress!")
             self.status_label.setStyleSheet(f"color: {COLORS['orange']}; font-size: 16px; font-weight: bold; border: none;")
-            self.status_detail.setText("Live game data")
+            self.status_detail.setText("Press 'Scout Game' to load player ranks")
             self._show_in_game()
 
         else:
@@ -245,6 +255,9 @@ class LiveGamePage(QWidget):
 
     def _on_scouting_finished(self, results: dict):
         self._scouting_results = results
+        if self._current_phase == 'InProgress':
+            self.status_detail.setText("Scouting complete")
+            self._show_in_game()
 
     # ---- Champion Select View ----
 
@@ -638,6 +651,31 @@ class LiveGamePage(QWidget):
                     my_team = team_two
                     enemy_team = team_one
                     break
+
+        # ---- Scout Button ----
+        if not self._scouting_results and not (self._scouting_worker and self._scouting_worker.isRunning()):
+            scout_btn = QPushButton("Scout Game — Load Player Ranks")
+            scout_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {COLORS['gold_dark']};
+                    color: {COLORS['text_bright']};
+                    font-weight: bold;
+                    padding: 12px 24px;
+                    border-radius: 6px;
+                    font-size: 14px;
+                }}
+                QPushButton:hover {{
+                    background-color: {COLORS['gold']};
+                    color: {COLORS['bg_dark']};
+                }}
+            """)
+            scout_btn.clicked.connect(self._start_in_game_scouting)
+            self.content_area.addWidget(scout_btn)
+        elif self._scouting_worker and self._scouting_worker.isRunning():
+            scouting_label = QLabel("Scouting players...")
+            scouting_label.setStyleSheet(f"color: {COLORS['gold']}; font-weight: bold; font-size: 14px;")
+            scouting_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.content_area.addWidget(scouting_label)
 
         # ---- Win Prediction ----
         if self._scouting_results:
