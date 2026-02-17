@@ -130,6 +130,106 @@ class NuzlockeExporter:
             </div>
             """
 
+        # Generate streak events section
+        streak_html = ""
+        streak_events = self.stats.get('streak_events', [])
+        if streak_events:
+            streak_rows = ""
+            for evt in streak_events:
+                if evt['type'] == 'win_bonus':
+                    icon = "🔥"
+                    desc = f"{evt['streak']} Win Streak — Bonus Token Earned!"
+                    evt_class = "win"
+                else:
+                    icon = "💀"
+                    desc = f"{evt['streak']} Loss Streak — Random Champion Eliminated!"
+                    evt_class = "loss"
+                streak_rows += f"""
+                <tr>
+                    <td class="result {evt_class}">{icon}</td>
+                    <td class="{evt_class}">{desc}</td>
+                    <td>Game #{evt.get('game_number', '?')}</td>
+                </tr>
+                """
+
+            streak_html = f"""
+            <div class="section streak-section">
+                <h2>⚡ Streak Events</h2>
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>Event</th>
+                            <th>When</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {streak_rows}
+                    </tbody>
+                </table>
+            </div>
+            """
+
+        # Generate graveyard section
+        graveyard_html = ""
+        graveyard = self.stats.get('graveyard', [])
+        if graveyard:
+            grave_rows = ""
+            for g in graveyard:
+                wins = g['wins_before_death']
+                death_cause = g.get('death_cause', 'loss')
+                if death_cause == 'played_eliminated':
+                    trigger = g.get('trigger_champion', '?')
+                    cause = f"Played {trigger} (eliminated)"
+                    cause_class = "loss"
+                elif death_cause == 'streak_penalty' or g.get('was_penalty'):
+                    cause = "Streak Penalty"
+                    cause_class = "loss"
+                else:
+                    cause = f"Game #{g['game_number']}"
+                    cause_class = ""
+                grave_rows += f"""
+                <tr>
+                    <td>💀 {g['champion']}</td>
+                    <td>{wins} win{'s' if wins != 1 else ''} before death</td>
+                    <td class="{cause_class}">{cause}</td>
+                </tr>
+                """
+
+            graveyard_html = f"""
+            <div class="section">
+                <h2>⚰️ Graveyard (Saddest First)</h2>
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>Champion</th>
+                            <th>Wins Before Death</th>
+                            <th>Cause of Death</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {grave_rows}
+                    </tbody>
+                </table>
+            </div>
+            """
+
+        # Generate MVP section
+        mvp_html = ""
+        mvp = self.stats.get('mvp')
+        if mvp:
+            mvp_html = f"""
+            <div class="section" style="text-align: center;">
+                <h2>👑 MVP Champion</h2>
+                <div style="font-size: 28px; font-weight: bold; color: #E6B84E; margin: 16px 0;">
+                    {mvp['champion']}
+                </div>
+                <div style="color: #A89968; font-size: 16px;">
+                    {mvp['streak']} Game Win Streak · {mvp['wins']}W / {mvp['losses']}L
+                </div>
+            </div>
+            """
+
         # Generate match history
         history_html = ""
         if self.stats['history']:
@@ -529,6 +629,16 @@ class NuzlockeExporter:
             color: #DA70D6;
         }}
 
+        .streak-section {{
+            background: linear-gradient(135deg, rgba(255, 152, 0, 0.1) 0%, rgba(139, 0, 0, 0.1) 100%);
+            border: 2px solid rgba(255, 152, 0, 0.3);
+        }}
+
+        .streak-section h2 {{
+            color: #FF9800;
+            text-shadow: 0 2px 10px rgba(255, 152, 0, 0.3);
+        }}
+
         .footer {{
             text-align: center;
             margin-top: 80px;
@@ -601,9 +711,12 @@ class NuzlockeExporter:
         </div>
 
         {highlights_html}
+        {mvp_html}
         {resurrection_html}
         {best_html}
         {survived_html}
+        {streak_html}
+        {graveyard_html}
         {eliminated_html}
         {history_html}
 

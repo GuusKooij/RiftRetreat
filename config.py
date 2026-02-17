@@ -47,7 +47,7 @@ SEASON_START_TIMESTAMP = 1736380800  # Jan 9, 2025 00:00:00 UTC
 # Application settings
 DEFAULT_REGION = 'EUW'
 APP_NAME = 'RiftRetreat'
-APP_VERSION = '1.1.0'
+APP_VERSION = '1.2.0'
 APP_AUTHOR = 'Treatey'
 
 

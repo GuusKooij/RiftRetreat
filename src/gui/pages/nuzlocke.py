@@ -8,6 +8,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QSize, QTimer, QPropertyAnimation, QEasingCurve, QPoint
 from PyQt6.QtGui import QPixmap, QIcon
 
+import random
+
 from src.gui.theme import COLORS
 from src.analytics.nuzlocke import NuzlockeTracker
 
@@ -92,6 +94,7 @@ class NuzlockePage(QWidget):
 
         active = self.tracker.get_active_run()
         if active:
+            self._active_run = active  # Store for streak/MVP lookups
             stats = self.tracker.get_run_stats(active)
             self._add_active_run(stats)
             self._add_champion_grid(stats)
@@ -116,6 +119,16 @@ class NuzlockePage(QWidget):
             "- WIN = champion survives (you keep them)\n"
             "- LOSE = champion is ELIMINATED (can't play them again)\n"
             "- Goal: survive as long as possible!\n\n"
+            "Streaks:\n"
+            "- Every 5 consecutive wins: earn a bonus Resurrection Token!\n"
+            "- Every 5 consecutive losses: a random alive champion is eliminated!\n"
+            "- Streaks stack (10, 15, 20...) so stay hot and avoid cold streaks!\n\n"
+            "Penalties:\n"
+            "- Playing an eliminated champion: a random alive champion is eliminated!\n"
+            "  (This breaks win streaks but does NOT add to loss streaks)\n\n"
+            "Tokens:\n"
+            "- Earn 1 Resurrection Token every 10 wins + bonus tokens from win streaks\n"
+            "- Use tokens to resurrect a random eliminated champion (gambling wheel)\n\n"
             "Ending a run is PERMANENT -- it cannot be restarted."
         )
         rules.setStyleSheet(f"color: {COLORS['text']}; font-size: 13px; border: none;")
@@ -207,6 +220,23 @@ class NuzlockePage(QWidget):
                 resurrect_btn.clicked.connect(self._spin_resurrection_wheel)
                 btn_layout.addWidget(resurrect_btn)
 
+            # Played eliminated champion penalty button
+            if stats.get('eliminated') and stats.get('survived'):
+                played_elim_btn = QPushButton("⚠️ Played Eliminated Champ")
+                played_elim_btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {COLORS['orange']};
+                        color: white;
+                        font-weight: bold;
+                        padding: 10px 20px;
+                        border-radius: 6px;
+                        font-size: 13px;
+                    }}
+                    QPushButton:hover {{ background-color: #FFA726; }}
+                """)
+                played_elim_btn.clicked.connect(self._played_eliminated_champion)
+                btn_layout.addWidget(played_elim_btn)
+
             # Export buttons
             export_html_btn = QPushButton("📄 Export HTML")
             export_html_btn.setStyleSheet(f"""
@@ -280,6 +310,51 @@ class NuzlockePage(QWidget):
             stats_layout.addWidget(w)
 
         layout.addLayout(stats_layout)
+
+        # Streak notification bar
+        active_run = getattr(self, '_active_run', None)
+        streak = self.tracker.get_current_streak(active_run)
+        if streak['count'] > 0:
+            streak_frame = QFrame()
+            streak_frame.setStyleSheet(f"border: none;")
+            streak_layout = QHBoxLayout(streak_frame)
+            streak_layout.setContentsMargins(0, 4, 0, 4)
+
+            if streak['type'] == 'win':
+                next_milestone = 5 - (streak['count'] % 5)
+                if next_milestone == 5 and streak['count'] % 5 == 0:
+                    streak_text = f"🔥 {streak['count']} consecutive wins — STREAK BONUS earned!"
+                else:
+                    streak_text = f"🔥 {streak['count']} consecutive wins — {next_milestone} more for bonus token!"
+                streak_color = COLORS['green']
+            else:
+                next_milestone = 5 - (streak['count'] % 5)
+                if next_milestone == 5 and streak['count'] % 5 == 0:
+                    streak_text = f"⚠️ {streak['count']} consecutive losses — random champion eliminated!"
+                else:
+                    streak_text = f"⚠️ {streak['count']} consecutive losses — {next_milestone} more until random champion dies!"
+                streak_color = COLORS['red']
+
+            streak_label = QLabel(streak_text)
+            streak_label.setStyleSheet(f"color: {streak_color}; font-weight: bold; font-size: 13px; border: none;")
+            streak_layout.addWidget(streak_label)
+            streak_layout.addStretch()
+            layout.addWidget(streak_frame)
+
+        # MVP champion
+        mvp = self.tracker.get_mvp_champion(active_run)
+        if mvp and mvp['streak'] >= 2:
+            mvp_frame = QFrame()
+            mvp_frame.setStyleSheet(f"border: none;")
+            mvp_layout = QHBoxLayout(mvp_frame)
+            mvp_layout.setContentsMargins(0, 4, 0, 4)
+
+            mvp_text = f"👑 MVP: {mvp['champion']} ({mvp['streak']} game win streak, {mvp['wins']}W / {mvp['losses']}L)"
+            mvp_label = QLabel(mvp_text)
+            mvp_label.setStyleSheet(f"color: {COLORS['gold']}; font-weight: bold; font-size: 13px; border: none;")
+            mvp_layout.addWidget(mvp_label)
+            mvp_layout.addStretch()
+            layout.addWidget(mvp_frame)
 
         # Resurrection history
         if stats.get('resurrections'):
@@ -606,6 +681,23 @@ class NuzlockePage(QWidget):
         grid.setSpacing(4)
         cols = 10
 
+        # Get MVP and streak info for indicators
+        active_run = getattr(self, '_active_run', None)
+        mvp = self.tracker.get_mvp_champion(active_run) if active_run else None
+        mvp_name = mvp['champion'] if mvp and mvp['streak'] >= 2 else None
+
+        # Track which champions are currently on a win streak (consecutive recent wins)
+        champ_on_streak = set()
+        if active_run:
+            streak_info = self.tracker.get_current_streak(active_run)
+            if streak_info['type'] == 'win' and streak_info['count'] >= 2:
+                # The last N games were all wins — find which champs are in that streak
+                for h in reversed(active_run.get('history', [])):
+                    if h['win']:
+                        champ_on_streak.add(h['champion'])
+                    else:
+                        break
+
         for i, champ in enumerate(filtered):
             name = champ['name']
             row_idx = i // cols
@@ -645,6 +737,13 @@ class NuzlockePage(QWidget):
                 {selected_border}
             """)
 
+            # Indicator (crown for MVP, flame for streak)
+            indicator = ""
+            if name == mvp_name:
+                indicator = "👑"
+            elif name in champ_on_streak and name in survived:
+                indicator = "🔥"
+
             # Icon
             icon = QLabel()
             icon.setFixedSize(40, 40)
@@ -658,12 +757,12 @@ class NuzlockePage(QWidget):
                         icon.setPixmap(px.scaled(36, 36, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
             cell_layout.addWidget(icon, alignment=Qt.AlignmentFlag.AlignCenter)
 
-            # Name + stats
+            # Name + stats + indicator
             win_data = champ_wins.get(name)
             if win_data:
-                label_text = f"{name}\n{win_data['wins']}W/{win_data['games']}G"
+                label_text = f"{indicator}{name}\n{win_data['wins']}W/{win_data['games']}G"
             else:
-                label_text = name
+                label_text = f"{indicator}{name}" if indicator else name
 
             name_lbl = QLabel(label_text)
             name_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1172,26 +1271,32 @@ class NuzlockePage(QWidget):
         # If it's a loss, play death animation first
         if not win:
             def after_animation():
-                self.tracker.record_result(champion_name, win)
+                streak_event = self.tracker.record_result(champion_name, win)
                 self._deselect_champion()
                 self._refresh_ui()
                 # Restore scroll position with delay to ensure UI is fully rebuilt
                 QTimer.singleShot(50, lambda: self.scroll_area.verticalScrollBar().setValue(scroll_value))
+                # Handle streak events after UI refresh
+                if streak_event:
+                    QTimer.singleShot(200, lambda: self._handle_streak_event(streak_event))
 
             self._play_death_animation(champion_name, after_animation)
         else:
             # Win - no animation, just record
-            self.tracker.record_result(champion_name, win)
+            streak_event = self.tracker.record_result(champion_name, win)
             self._deselect_champion()
             self._refresh_ui()
             # Restore scroll position with delay to ensure UI is fully rebuilt
             QTimer.singleShot(50, lambda: self.scroll_area.verticalScrollBar().setValue(scroll_value))
+            # Handle streak events after UI refresh
+            if streak_event:
+                QTimer.singleShot(200, lambda: self._handle_streak_event(streak_event))
 
     def _record_result(self, win: bool):
         """Record result from in-page buttons."""
         if not self.selected_champion:
             return
-        self.tracker.record_result(self.selected_champion, win)
+        streak_event = self.tracker.record_result(self.selected_champion, win)
         self._deselect_champion()
         # Reset button styles
         if hasattr(self, 'win_btn'):
@@ -1244,6 +1349,148 @@ class NuzlockePage(QWidget):
             self.tracker.end_run()
             self._refresh_ui()
 
+    def _played_eliminated_champion(self):
+        """Handle the penalty for playing an eliminated champion in a real game."""
+        active = self.tracker.get_active_run()
+        if not active:
+            return
+
+        eliminated = active.get('eliminated', [])
+        survived = active.get('survived', [])
+
+        if not eliminated or not survived:
+            QMessageBox.information(
+                self, "Cannot Apply Penalty",
+                "No eliminated champions or no alive champions to penalize."
+            )
+            return
+
+        # Ask which eliminated champion was played
+        from PyQt6.QtWidgets import QInputDialog
+        champ, ok = QInputDialog.getItem(
+            self, "Which Eliminated Champion?",
+            "Select the eliminated champion you played:",
+            sorted(eliminated), 0, False
+        )
+        if not ok or not champ:
+            return
+
+        # Confirm
+        reply = QMessageBox.question(
+            self, "⚠️ Played Eliminated Champion",
+            f"You played {champ} who is ELIMINATED.\n\n"
+            f"Penalty: A random alive champion will be eliminated!\n\n"
+            f"Proceed?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        # Execute penalty
+        success, victim = self.tracker.penalize_played_eliminated(champ)
+        if success:
+            # Build wheel pool from all non-eliminated champions (after penalty)
+            new_eliminated = set(active.get('eliminated', []))
+            if hasattr(self, '_grid_all_champs') and self._grid_all_champs:
+                wheel_pool = [c['name'] for c in self._grid_all_champs if c['name'] not in new_eliminated]
+            else:
+                wheel_pool = list(survived)
+            random.shuffle(wheel_pool)
+            self._show_played_elim_penalty_wheel(champ, victim, wheel_pool)
+        else:
+            QMessageBox.warning(self, "Penalty Failed", victim)
+
+    def _show_played_elim_penalty_wheel(self, trigger_champ: str, victim: str, pool: list):
+        """Show spinning wheel for played-eliminated penalty."""
+        if len(pool) < 2:
+            self._show_played_elim_penalty_result(trigger_champ, victim)
+            return
+
+        self.pe_overlay = QLabel(
+            f"⚠️ PLAYED {trigger_champ.upper()}!\n\n"
+            f"(ELIMINATED CHAMPION)\n\n???", self
+        )
+        self.pe_overlay.setStyleSheet(f"""
+            QLabel {{
+                background-color: rgba(139, 69, 0, 240);
+                color: white;
+                font-size: 28px;
+                font-weight: bold;
+                padding: 50px 80px;
+                border-radius: 16px;
+                border: 4px solid {COLORS['orange']};
+            }}
+        """)
+        self.pe_overlay.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.pe_overlay.adjustSize()
+        self.pe_overlay.move(
+            (self.width() - self.pe_overlay.width()) // 2,
+            (self.height() - self.pe_overlay.height()) // 2
+        )
+        self.pe_overlay.show()
+
+        self._pe_pool = pool
+        self._pe_victim = victim
+        self._pe_trigger = trigger_champ
+        self._pe_index = 0
+        self._pe_cycles = 0
+        self._pe_max_cycles = 15
+
+        def cycle():
+            if self._pe_cycles < self._pe_max_cycles:
+                champ = self._pe_pool[self._pe_index % len(self._pe_pool)]
+                self.pe_overlay.setText(
+                    f"⚠️ PLAYED {self._pe_trigger.upper()}!\n\n"
+                    f"(ELIMINATED CHAMPION)\n\n{champ}"
+                )
+                self.pe_overlay.adjustSize()
+                self.pe_overlay.move(
+                    (self.width() - self.pe_overlay.width()) // 2,
+                    (self.height() - self.pe_overlay.height()) // 2
+                )
+                self._pe_index += 1
+                self._pe_cycles += 1
+                QTimer.singleShot(100, cycle)
+            else:
+                self._show_played_elim_penalty_result(self._pe_trigger, self._pe_victim)
+
+        cycle()
+
+    def _show_played_elim_penalty_result(self, trigger_champ: str, victim: str):
+        """Show final result of played-eliminated penalty wheel."""
+        if hasattr(self, 'pe_overlay') and self.pe_overlay:
+            self.pe_overlay.deleteLater()
+
+        result_overlay = QLabel(
+            f"⚠️ PENALTY!\n\nYou played {trigger_champ} (eliminated)\n\n"
+            f"💀 {victim}\n\nELIMINATED!", self
+        )
+        result_overlay.setStyleSheet(f"""
+            QLabel {{
+                background-color: rgba(139, 69, 0, 240);
+                color: white;
+                font-size: 28px;
+                font-weight: bold;
+                padding: 50px 80px;
+                border-radius: 16px;
+                border: 4px solid {COLORS['red']};
+            }}
+        """)
+        result_overlay.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        result_overlay.adjustSize()
+        result_overlay.move(
+            (self.width() - result_overlay.width()) // 2,
+            (self.height() - result_overlay.height()) // 2
+        )
+        result_overlay.show()
+
+        def cleanup():
+            result_overlay.deleteLater()
+            self._refresh_ui()
+
+        QTimer.singleShot(2500, cleanup)
+
     def _spin_resurrection_wheel(self):
         """Spin the gambling wheel to resurrect a random eliminated champion."""
         from PyQt6.QtCore import QTimer
@@ -1293,8 +1540,10 @@ class NuzlockePage(QWidget):
         if reply != QMessageBox.StandardButton.Yes:
             return
 
-        # Show spinning animation with champion names cycling
-        self._show_spinning_wheel(eliminated)
+        # Show spinning animation with champion names cycling (shuffled)
+        shuffled = list(eliminated)
+        random.shuffle(shuffled)
+        self._show_spinning_wheel(shuffled)
 
     def _show_spinning_wheel(self, eliminated: list):
         """Show spinning wheel animation cycling through eliminated champions."""
@@ -1380,6 +1629,146 @@ class NuzlockePage(QWidget):
         # Auto-hide and refresh
         QTimer.singleShot(2500, lambda: [self.wheel_overlay.deleteLater(), self._refresh_ui()])
 
+    def _handle_streak_event(self, event: dict):
+        """Handle a streak milestone event (bonus token or penalty elimination)."""
+        if event['type'] == 'win_bonus':
+            self._show_streak_bonus_notification(event['streak'])
+        elif event['type'] == 'loss_penalty':
+            # Build wheel pool from ALL non-eliminated champions (not just survived)
+            eliminated = set()
+            active = self.tracker.get_active_run()
+            if active:
+                eliminated = set(active.get('eliminated', []))
+            if hasattr(self, '_grid_all_champs') and self._grid_all_champs:
+                wheel_pool = [c['name'] for c in self._grid_all_champs if c['name'] not in eliminated]
+            else:
+                wheel_pool = list(event.get('pool', []))
+            random.shuffle(wheel_pool)
+            self._show_streak_penalty_wheel(
+                event['streak'],
+                event.get('champion', ''),
+                wheel_pool
+            )
+
+    def _show_streak_bonus_notification(self, streak_count: int):
+        """Show green overlay for streak bonus token."""
+        overlay = QLabel(f"🔥 STREAK BONUS!\n\n{streak_count} Wins in a Row\n+1 Resurrection Token!", self)
+        overlay.setStyleSheet(f"""
+            QLabel {{
+                background-color: rgba(0, 100, 0, 240);
+                color: {COLORS['gold']};
+                font-size: 28px;
+                font-weight: bold;
+                padding: 50px 80px;
+                border-radius: 16px;
+                border: 4px solid {COLORS['green']};
+            }}
+        """)
+        overlay.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        overlay.adjustSize()
+        overlay.move(
+            (self.width() - overlay.width()) // 2,
+            (self.height() - overlay.height()) // 2
+        )
+        overlay.show()
+        QTimer.singleShot(2500, lambda: overlay.deleteLater())
+
+    def _show_streak_penalty_wheel(self, streak_count: int, champion: str, pool: list):
+        """Show red-themed spinning wheel for loss streak penalty elimination."""
+        if not champion:
+            return
+
+        # Use the pool (survived champions before elimination) for the wheel
+        # If pool is empty or too small, just show the result directly
+        if len(pool) < 2:
+            self._show_streak_penalty_result(streak_count, champion)
+            return
+
+        # Create red-themed spinning overlay
+        self.penalty_overlay = QLabel(f"⚠️ LOSS STREAK PENALTY!\n\n{streak_count} Losses in a Row\n\n???", self)
+        self.penalty_overlay.setStyleSheet(f"""
+            QLabel {{
+                background-color: rgba(139, 0, 0, 240);
+                color: white;
+                font-size: 28px;
+                font-weight: bold;
+                padding: 50px 80px;
+                border-radius: 16px;
+                border: 4px solid {COLORS['red']};
+            }}
+        """)
+        self.penalty_overlay.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.penalty_overlay.adjustSize()
+        self.penalty_overlay.move(
+            (self.width() - self.penalty_overlay.width()) // 2,
+            (self.height() - self.penalty_overlay.height()) // 2
+        )
+        self.penalty_overlay.show()
+
+        # Spin through survived champions, then land on the chosen one
+        self._penalty_pool = pool
+        self._penalty_champion = champion
+        self._penalty_streak = streak_count
+        self._penalty_index = 0
+        self._penalty_cycles = 0
+        self._penalty_max_cycles = 15
+
+        def cycle():
+            if self._penalty_cycles < self._penalty_max_cycles:
+                champ = self._penalty_pool[self._penalty_index % len(self._penalty_pool)]
+                self.penalty_overlay.setText(
+                    f"⚠️ LOSS STREAK PENALTY!\n\n{self._penalty_streak} Losses in a Row\n\n{champ}"
+                )
+                self.penalty_overlay.adjustSize()
+                self.penalty_overlay.move(
+                    (self.width() - self.penalty_overlay.width()) // 2,
+                    (self.height() - self.penalty_overlay.height()) // 2
+                )
+                self._penalty_index += 1
+                self._penalty_cycles += 1
+                QTimer.singleShot(100, cycle)
+            else:
+                # Land on the actual chosen champion
+                self._show_streak_penalty_result(self._penalty_streak, self._penalty_champion)
+
+        cycle()
+
+    def _show_streak_penalty_result(self, streak_count: int, champion: str):
+        """Show final result of the penalty wheel."""
+        # Clean up spinning overlay if it exists
+        if hasattr(self, 'penalty_overlay') and self.penalty_overlay:
+            self.penalty_overlay.deleteLater()
+
+        result_overlay = QLabel(
+            f"💀💀💀\n\n{champion}\n\nELIMINATED!\n\n"
+            f"({streak_count} loss streak penalty)",
+            self
+        )
+        result_overlay.setStyleSheet(f"""
+            QLabel {{
+                background-color: rgba(139, 0, 0, 240);
+                color: white;
+                font-size: 32px;
+                font-weight: bold;
+                padding: 50px 80px;
+                border-radius: 16px;
+                border: 4px solid {COLORS['red']};
+            }}
+        """)
+        result_overlay.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        result_overlay.adjustSize()
+        result_overlay.move(
+            (self.width() - result_overlay.width()) // 2,
+            (self.height() - result_overlay.height()) // 2
+        )
+        result_overlay.show()
+
+        def cleanup():
+            result_overlay.deleteLater()
+            self._refresh_ui()
+
+        QTimer.singleShot(2500, cleanup)
+
     def _export_html(self):
         """Export current run to HTML."""
         from PyQt6.QtWidgets import QFileDialog
@@ -1461,29 +1850,36 @@ class NuzlockePage(QWidget):
 
 
     def _add_graveyard_visual(self, stats):
-        """Show eliminated champions as a graveyard with tombstones."""
+        """Show eliminated champions as a graveyard with tombstones, sorted by saddest deaths."""
         eliminated = stats.get('eliminated', [])
         if not eliminated:
             return
 
         card, layout = self._card(f"⚰️ Graveyard ({len(eliminated)} Fallen Champions)")
 
-        desc = QLabel("These champions have been eliminated and cannot be played again (unless resurrected).")
+        desc = QLabel("Sorted by saddest deaths first (most wins before falling).")
         desc.setStyleSheet(f"color: {COLORS['text_dim']}; font-size: 12px; font-style: italic; border: none;")
         layout.addWidget(desc)
+
+        # Get enhanced graveyard stats (sorted saddest first)
+        active_run = getattr(self, '_active_run', None)
+        graveyard = self.tracker.get_graveyard_stats(active_run)
 
         # Grid of tombstones
         grid = QGridLayout()
         grid.setSpacing(12)
 
-        for i, champ in enumerate(sorted(eliminated)):
+        for i, entry in enumerate(graveyard):
+            champ = entry['champion']
+            wins_before = entry['wins_before_death']
+            game_num = entry['game_number']
             row = i // 6
             col = i % 6
 
             tomb_widget = QWidget()
             tomb_layout = QVBoxLayout(tomb_widget)
-            tomb_layout.setContentsMargins(8, 8, 8, 8)
-            tomb_layout.setSpacing(4)
+            tomb_layout.setContentsMargins(8, 6, 8, 6)
+            tomb_layout.setSpacing(2)
 
             # Champion icon with red overlay
             if self.dd:
@@ -1504,9 +1900,30 @@ class NuzlockePage(QWidget):
             name_label.setWordWrap(True)
             tomb_layout.addWidget(name_label)
 
+            # Death info: wins before death + game number + cause
+            death_cause = entry.get('death_cause', 'loss')
+            trigger = entry.get('trigger_champion', '')
+            if death_cause == 'played_eliminated':
+                if wins_before > 0:
+                    death_info = QLabel(f"{wins_before}W before fall\nPlayed {trigger}")
+                else:
+                    death_info = QLabel(f"Played {trigger}")
+            elif death_cause == 'streak_penalty' or (entry.get('was_penalty', False) and death_cause != 'loss'):
+                if wins_before > 0:
+                    death_info = QLabel(f"{wins_before}W before fall\nStreak penalty")
+                else:
+                    death_info = QLabel(f"Streak penalty")
+            elif wins_before > 0:
+                death_info = QLabel(f"{wins_before}W before fall\nGame #{game_num}")
+            else:
+                death_info = QLabel(f"Fell on Game #{game_num}")
+            death_info.setStyleSheet(f"color: {COLORS['text_dim']}; font-size: 9px; border: none;")
+            death_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            tomb_layout.addWidget(death_info)
+
             # Tombstone emoji
             tomb_emoji = QLabel("🪦")
-            tomb_emoji.setStyleSheet(f"font-size: 20px; border: none;")
+            tomb_emoji.setStyleSheet(f"font-size: 16px; border: none;")
             tomb_emoji.setAlignment(Qt.AlignmentFlag.AlignCenter)
             tomb_layout.addWidget(tomb_emoji)
 
@@ -1517,7 +1934,7 @@ class NuzlockePage(QWidget):
                     border-radius: 8px;
                 }}
             """)
-            tomb_widget.setFixedSize(100, 140)
+            tomb_widget.setFixedSize(100, 160)
 
             grid.addWidget(tomb_widget, row, col)
 

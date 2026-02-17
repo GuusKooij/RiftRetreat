@@ -9,6 +9,65 @@ from collections import defaultdict
 from datetime import datetime
 
 
+# Rarity tiers and colors
+RARITY_COLORS = {
+    'Common': '#7B818C',     # grey
+    'Rare': '#2196F3',       # blue
+    'Epic': '#9C27B0',       # purple
+    'Legendary': '#C8AA6E',  # gold
+}
+
+ACHIEVEMENT_RARITY = {
+    # Common — basic milestones
+    'games_10': 'Common', 'wins_10': 'Common', 'streak_3': 'Common',
+    'champs_5': 'Common', 'doubles_10': 'Common', 'fb_5': 'Common',
+    # Rare — moderate effort
+    'games_50': 'Rare', 'games_100': 'Rare', 'wins_25': 'Rare',
+    'streak_5': 'Rare', 'champs_10': 'Rare', 'quadrakill': 'Rare',
+    'all_roles': 'Rare', 'triples_5': 'Rare', 'fb_10': 'Rare',
+    'marathon_5': 'Rare',
+    # Epic — difficult
+    'games_200': 'Epic', 'wins_50': 'Epic', 'streak_7': 'Epic',
+    'perfect_game': 'Epic', 'kda_10': 'Epic', 'cs_10': 'Epic',
+    'vision_100': 'Epic', 'damage_40k': 'Epic', 'champs_20': 'Epic',
+    'marathon_8': 'Epic',
+    # Legendary — very rare
+    'games_500': 'Legendary', 'wins_100': 'Legendary',
+    'streak_10': 'Legendary', 'pentakill': 'Legendary',
+}
+
+# Secret achievement definitions: (id, name, description, check_function_name)
+SECRET_ACHIEVEMENT_DEFS = [
+    ('secret_pacifist', 'The Pacifist', 'Win a game with 0 kills', 'check_secret_pacifist'),
+    ('secret_ghost', 'Ghost', 'Win with 0 kills AND 0 deaths', 'check_secret_ghost'),
+    ('secret_iron_will', 'Iron Will', 'Win while 10k+ gold behind', 'check_secret_iron_will'),
+    ('secret_feeder', 'The Feeder', 'Die 20+ times in a single game', 'check_secret_feeder'),
+    ('secret_zero_farm', 'Zero Farm', 'Win with less than 10 CS', 'check_secret_zero_farm'),
+    ('secret_vision_blind', 'Vision Blind', 'Win with 0 vision score', 'check_secret_vision_blind'),
+    ('secret_speed_run', 'Speed Run', 'Win a game in under 15 minutes', 'check_secret_speed_run'),
+    ('secret_marathon', 'The Marathon', 'Play a 50+ minute game', 'check_secret_marathon'),
+    ('secret_no_damage', 'What Damage?', 'Win dealing less than 5k damage', 'check_secret_no_damage'),
+    ('secret_tank_god', 'Tank God', 'Take 60k+ damage in a single game', 'check_secret_tank_god'),
+    ('secret_the_wall', 'The Wall', 'Take 80k+ damage AND win', 'check_secret_the_wall'),
+    ('secret_obj_hunter', 'Dragon Slayer', 'Kill 5+ dragons in one game', 'check_secret_obj_hunter'),
+    ('secret_tower_destroyer', 'Tower Destroyer', 'Destroy 6+ turrets in one game', 'check_secret_tower_destroyer'),
+    ('secret_ward_machine', 'Ward Machine', 'Place 30+ wards in a single game', 'check_secret_ward_machine'),
+    ('secret_fb_streak', 'First Blood Machine', 'Get first blood 3 games in a row', 'check_secret_fb_streak'),
+    ('secret_no_assist', 'Solo Carry', 'Win with 0 assists', 'check_secret_no_assist'),
+    ('secret_walking_ward', 'Walking Ward', 'Get 150+ vision score', 'check_secret_walking_ward'),
+    ('secret_gold_miner', 'Gold Miner', 'Earn 25k+ gold in a single game', 'check_secret_gold_miner'),
+    ('secret_cs_perfect', 'CS Perfectionist', 'Average 12+ CS/min in a game', 'check_secret_cs_perfect'),
+    ('secret_dmg_dealer', 'Damage Dealer', 'Deal 50k+ total damage in a game', 'check_secret_dmg_dealer'),
+    ('secret_quadra_collector', 'Quadra Collector', 'Get 3+ quadra kills total', 'check_secret_quadra_collector'),
+    ('secret_comeback_king', 'Comeback King', 'Win 5 games while 2k+ gold behind', 'check_secret_comeback_king'),
+    ('secret_baron_stealer', 'Baron Stealer', 'Kill 3+ barons in one game', 'check_secret_baron_stealer'),
+    ('secret_inhibitor_breaker', 'Inhibitor Breaker', 'Destroy 3+ inhibitors in one game', 'check_secret_inhibitor_breaker'),
+    ('secret_stomp_master', 'Stomp Master', 'Win 10 games with 5k+ gold lead', 'check_secret_stomp_master'),
+    ('secret_double_double', 'Double-Double', '10+ kills AND 10+ assists in one game', 'check_secret_double_double'),
+    ('secret_kill_secured', 'Kill Secured', 'Win with 20+ kills and less than 5 assists', 'check_secret_kill_secured'),
+]
+
+
 # Achievement definitions: (id, name, description, check_function_name)
 ACHIEVEMENT_DEFS = [
     # Game count milestones
@@ -106,6 +165,7 @@ class AchievementTracker:
                 current = 1 if result else 0
                 threshold = 1
 
+            rarity = ACHIEVEMENT_RARITY.get(aid, 'Common')
             all_achievements.append({
                 'id': aid,
                 'name': name,
@@ -114,6 +174,8 @@ class AchievementTracker:
                 'current': current,
                 'target': threshold or 1,
                 'progress_pct': min(round(current / max(threshold or 1, 1) * 100, 1), 100),
+                'rarity': rarity,
+                'rarity_color': RARITY_COLORS.get(rarity, '#7B818C'),
             })
 
         return all_achievements
@@ -247,4 +309,205 @@ class AchievementTracker:
         for s in sessions:
             if s['games'] >= threshold:
                 return s['date']
+        return None
+
+    # --- Secret achievement checks ---
+
+    def progress_secrets(self) -> list[dict]:
+        """Return all secret achievements. Earned ones show full details,
+        unearned ones show as '???' with no hints."""
+        results = []
+        for sid, name, desc, check_fn in SECRET_ACHIEVEMENT_DEFS:
+            checker = getattr(self, check_fn, None)
+            if checker is None:
+                continue
+            result = checker()
+            if result:
+                results.append({
+                    'id': sid,
+                    'name': name,
+                    'description': desc,
+                    'earned': True,
+                    'date': result if isinstance(result, str) else None,
+                })
+            else:
+                results.append({
+                    'id': sid,
+                    'name': '???',
+                    'description': 'Hidden until unlocked',
+                    'earned': False,
+                })
+        return results
+
+    def check_secret_pacifist(self):
+        for m in self.matches:
+            if m['win'] and m['kills'] == 0:
+                return m['game_start'][:10]
+        return None
+
+    def check_secret_ghost(self):
+        for m in self.matches:
+            if m['win'] and m['kills'] == 0 and m['deaths'] == 0:
+                return m['game_start'][:10]
+        return None
+
+    def check_secret_iron_will(self):
+        for m in self.matches:
+            if m['win'] and m.get('game_end_gold_diff', 0) < -10000:
+                return m['game_start'][:10]
+        return None
+
+    def check_secret_feeder(self):
+        for m in self.matches:
+            if m['deaths'] >= 20:
+                return m['game_start'][:10]
+        return None
+
+    def check_secret_zero_farm(self):
+        for m in self.matches:
+            if m['win'] and m.get('cs', 0) < 10:
+                return m['game_start'][:10]
+        return None
+
+    def check_secret_vision_blind(self):
+        for m in self.matches:
+            if m['win'] and m.get('vision_score', 0) == 0:
+                return m['game_start'][:10]
+        return None
+
+    def check_secret_speed_run(self):
+        for m in self.matches:
+            if m['win'] and m.get('game_duration_min', 99) < 15:
+                return m['game_start'][:10]
+        return None
+
+    def check_secret_marathon(self):
+        for m in self.matches:
+            if m.get('game_duration_min', 0) >= 50:
+                return m['game_start'][:10]
+        return None
+
+    def check_secret_no_damage(self):
+        for m in self.matches:
+            if m['win'] and m.get('total_damage_dealt', 99999) < 5000:
+                return m['game_start'][:10]
+        return None
+
+    def check_secret_tank_god(self):
+        for m in self.matches:
+            if m.get('damage_taken', 0) >= 60000:
+                return m['game_start'][:10]
+        return None
+
+    def check_secret_the_wall(self):
+        for m in self.matches:
+            if m['win'] and m.get('damage_taken', 0) >= 80000:
+                return m['game_start'][:10]
+        return None
+
+    def check_secret_obj_hunter(self):
+        for m in self.matches:
+            if m.get('dragon_kills', 0) >= 5:
+                return m['game_start'][:10]
+        return None
+
+    def check_secret_tower_destroyer(self):
+        for m in self.matches:
+            if m.get('turret_kills', 0) >= 6:
+                return m['game_start'][:10]
+        return None
+
+    def check_secret_ward_machine(self):
+        for m in self.matches:
+            if m.get('wards_placed', 0) >= 30:
+                return m['game_start'][:10]
+        return None
+
+    def check_secret_fb_streak(self):
+        streak = 0
+        for m in self.matches:
+            if m.get('first_blood', False):
+                streak += 1
+                if streak >= 3:
+                    return m['game_start'][:10]
+            else:
+                streak = 0
+        return None
+
+    def check_secret_no_assist(self):
+        for m in self.matches:
+            if m['win'] and m['assists'] == 0:
+                return m['game_start'][:10]
+        return None
+
+    def check_secret_walking_ward(self):
+        for m in self.matches:
+            if m.get('vision_score', 0) >= 150:
+                return m['game_start'][:10]
+        return None
+
+    def check_secret_gold_miner(self):
+        for m in self.matches:
+            if m.get('gold_earned', 0) >= 25000:
+                return m['game_start'][:10]
+        return None
+
+    def check_secret_cs_perfect(self):
+        for m in self.matches:
+            if m.get('cs_per_min', 0) >= 12:
+                return m['game_start'][:10]
+        return None
+
+    def check_secret_dmg_dealer(self):
+        for m in self.matches:
+            if m.get('total_damage_dealt', 0) >= 50000:
+                return m['game_start'][:10]
+        return None
+
+    def check_secret_quadra_collector(self):
+        total = sum(m.get('quadra_kills', 0) for m in self.matches)
+        if total >= 3:
+            return True
+        return None
+
+    def check_secret_comeback_king(self):
+        count = 0
+        for m in self.matches:
+            if m['win'] and m.get('game_end_gold_diff', 0) < -2000:
+                count += 1
+                if count >= 5:
+                    return m['game_start'][:10]
+        return None
+
+    def check_secret_baron_stealer(self):
+        for m in self.matches:
+            if m.get('baron_kills', 0) >= 3:
+                return m['game_start'][:10]
+        return None
+
+    def check_secret_inhibitor_breaker(self):
+        for m in self.matches:
+            if m.get('inhibitor_kills', 0) >= 3:
+                return m['game_start'][:10]
+        return None
+
+    def check_secret_stomp_master(self):
+        count = 0
+        for m in self.matches:
+            if m['win'] and m.get('game_end_gold_diff', 0) >= 5000:
+                count += 1
+                if count >= 10:
+                    return m['game_start'][:10]
+        return None
+
+    def check_secret_double_double(self):
+        for m in self.matches:
+            if m['kills'] >= 10 and m['assists'] >= 10:
+                return m['game_start'][:10]
+        return None
+
+    def check_secret_kill_secured(self):
+        for m in self.matches:
+            if m['win'] and m['kills'] >= 20 and m['assists'] < 5:
+                return m['game_start'][:10]
         return None

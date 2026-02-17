@@ -57,6 +57,9 @@ class RecordsPage(QWidget):
         # Achievement badges
         self._add_achievements(achievement_tracker)
 
+        # Secret achievements
+        self._add_secret_achievements(achievement_tracker)
+
         # Personal records
         self._add_personal_records(stats_analyzer)
 
@@ -92,20 +95,29 @@ class RecordsPage(QWidget):
             grid.setSpacing(8)
 
             for i, a in enumerate(earned):
+                rarity_color = a.get('rarity_color', COLORS['gold'])
+                rarity_name = a.get('rarity', 'Common')
+
                 badge = QFrame()
                 badge.setStyleSheet(f"""
                     QFrame {{
                         background-color: {COLORS['bg_dark']};
-                        border: 2px solid {COLORS['gold']};
+                        border: 2px solid {rarity_color};
                         border-radius: 8px;
                     }}
                 """)
                 badge_layout = QVBoxLayout(badge)
-                badge_layout.setContentsMargins(10, 8, 10, 8)
+                badge_layout.setContentsMargins(10, 6, 10, 8)
                 badge_layout.setSpacing(2)
 
+                # Rarity label
+                rarity_lbl = QLabel(rarity_name.upper())
+                rarity_lbl.setStyleSheet(f"color: {rarity_color}; font-size: 8px; font-weight: bold; border: none;")
+                rarity_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                badge_layout.addWidget(rarity_lbl)
+
                 name = QLabel(a['name'])
-                name.setStyleSheet(f"color: {COLORS['gold']}; font-weight: bold; font-size: 12px; border: none;")
+                name.setStyleSheet(f"color: {rarity_color}; font-weight: bold; font-size: 12px; border: none;")
                 name.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 badge_layout.addWidget(name)
 
@@ -126,11 +138,12 @@ class RecordsPage(QWidget):
             layout.addWidget(in_progress_label)
 
             for a in not_earned[:8]:
+                rarity_color = a.get('rarity_color', COLORS['text'])
                 row = QHBoxLayout()
 
                 name = QLabel(a['name'])
                 name.setFixedWidth(160)
-                name.setStyleSheet(f"color: {COLORS['text']}; border: none;")
+                name.setStyleSheet(f"color: {rarity_color}; border: none;")
                 row.addWidget(name)
 
                 bar = QProgressBar()
@@ -160,6 +173,100 @@ class RecordsPage(QWidget):
                 row.addWidget(desc)
 
                 layout.addLayout(row)
+
+        self.layout_main.addWidget(card)
+
+    def _add_secret_achievements(self, at):
+        """Add secret achievements section — earned show full details, locked show ???."""
+        secrets = at.progress_secrets()
+        earned = [s for s in secrets if s['earned']]
+        locked = [s for s in secrets if not s['earned']]
+
+        card, layout = self._card(f"Secret Achievements ({len(earned)} discovered)")
+
+        if earned:
+            earned_label = QLabel("Unlocked:")
+            earned_label.setStyleSheet(f"color: {COLORS['purple']}; font-weight: bold; font-size: 13px; border: none;")
+            layout.addWidget(earned_label)
+
+            grid = QGridLayout()
+            grid.setSpacing(8)
+
+            for i, a in enumerate(earned):
+                badge = QFrame()
+                badge.setStyleSheet(f"""
+                    QFrame {{
+                        background-color: {COLORS['bg_dark']};
+                        border: 2px solid {COLORS['purple']};
+                        border-radius: 8px;
+                    }}
+                """)
+                badge_layout = QVBoxLayout(badge)
+                badge_layout.setContentsMargins(10, 6, 10, 8)
+                badge_layout.setSpacing(2)
+
+                icon_lbl = QLabel("SECRET")
+                icon_lbl.setStyleSheet(f"color: {COLORS['purple']}; font-size: 8px; font-weight: bold; border: none;")
+                icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                badge_layout.addWidget(icon_lbl)
+
+                name = QLabel(a['name'])
+                name.setStyleSheet(f"color: {COLORS['purple']}; font-weight: bold; font-size: 12px; border: none;")
+                name.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                badge_layout.addWidget(name)
+
+                desc = QLabel(a['description'])
+                desc.setStyleSheet(f"color: {COLORS['text_dim']}; font-size: 10px; border: none;")
+                desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                desc.setWordWrap(True)
+                badge_layout.addWidget(desc)
+
+                grid.addWidget(badge, i // 4, i % 4)
+
+            layout.addLayout(grid)
+
+        # Show up to 8 locked placeholders
+        if locked:
+            locked_label = QLabel("Undiscovered:")
+            locked_label.setStyleSheet(f"color: {COLORS['text_dim']}; font-weight: bold; font-size: 13px; margin-top: 12px; border: none;")
+            layout.addWidget(locked_label)
+
+            grid = QGridLayout()
+            grid.setSpacing(8)
+
+            shown = min(len(locked), 8)
+            for i in range(shown):
+                badge = QFrame()
+                badge.setStyleSheet(f"""
+                    QFrame {{
+                        background-color: {COLORS['bg_dark']};
+                        border: 2px solid {COLORS['border']};
+                        border-radius: 8px;
+                    }}
+                """)
+                badge_layout = QVBoxLayout(badge)
+                badge_layout.setContentsMargins(10, 8, 10, 8)
+                badge_layout.setSpacing(4)
+
+                lock_icon = QLabel("🔒")
+                lock_icon.setStyleSheet("font-size: 18px; border: none;")
+                lock_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                badge_layout.addWidget(lock_icon)
+
+                name = QLabel("???")
+                name.setStyleSheet(f"color: {COLORS['text_dim']}; font-weight: bold; font-size: 12px; border: none;")
+                name.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                badge_layout.addWidget(name)
+
+                grid.addWidget(badge, i // 4, i % 4)
+
+            layout.addLayout(grid)
+
+            remaining = len(locked) - shown
+            if remaining > 0:
+                more_label = QLabel(f"...and {remaining} more secrets to discover")
+                more_label.setStyleSheet(f"color: {COLORS['text_dim']}; font-size: 11px; font-style: italic; border: none;")
+                layout.addWidget(more_label)
 
         self.layout_main.addWidget(card)
 

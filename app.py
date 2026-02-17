@@ -10,7 +10,7 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("RiftRetreat")
     app.setOrganizationName("Treatey")
-    app.setApplicationVersion("1.1.0")
+    app.setApplicationVersion("1.2.0")
 
     # Create splash screen
     splash = QSplashScreen()

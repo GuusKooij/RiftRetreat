@@ -294,7 +294,7 @@ class MainWindow(QMainWindow):
         sidebar_layout.addStretch()
 
         # Version
-        version = QLabel("v1.1.0")
+        version = QLabel("v1.2.0")
         version.setStyleSheet(f"color: {COLORS['text_dim']}; font-size: 10px; padding: 12px; background: transparent;")
         sidebar_layout.addWidget(version)
 
@@ -437,7 +437,7 @@ class MainWindow(QMainWindow):
         self.rank_predictor_page.update_data(season_matches, current_rank=current_rank)
         self.stat_cards_page.update_data(stats, tilt, champ_analyzer, matches=self.dm.matches, data_dragon=self.dm.dd)
 
-        # New v1.1.0 pages
+        # New v1.2.0 pages
         self.kryptonite_page.update_data(self.dm.matches, data_dragon=self.dm.dd)
         self.item_builds_page.update_data(self.dm.matches, data_dragon=self.dm.dd)
         self.coaching_report_page.update_data(
