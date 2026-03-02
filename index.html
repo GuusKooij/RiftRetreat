@@ -68,6 +68,17 @@
         .badges img {
             margin: 0 5px;
         }
+        .new-tag {
+            display: inline-block;
+            background: #C89B3C;
+            color: #0A1428;
+            font-size: 0.65em;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 4px;
+            vertical-align: middle;
+            margin-left: 6px;
+        }
         .features {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -79,6 +90,10 @@
             border: 1px solid #3C3C3C;
             border-radius: 8px;
             padding: 20px;
+        }
+        .feature-card.highlight {
+            border-color: #C89B3C;
+            background: rgba(200, 155, 60, 0.08);
         }
         .feature-card h3 {
             color: #C89B3C;
@@ -102,24 +117,32 @@
             <h1>🎮 RiftRetreat</h1>
             <p>Your Ultimate League of Legends Companion</p>
             <div class="badges">
-                <img src="https://img.shields.io/badge/version-1.2.0-blue" alt="Version">
+                <img src="https://img.shields.io/badge/version-2.0.0-blue" alt="Version">
                 <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform">
                 <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
             </div>
         </div>
 
         <div class="download-section">
-            <h2>Download RiftRetreat v1.2.0</h2>
-            <a href="https://github.com/GuusKooij/RiftRetreat/releases/download/v1.2.0/RiftRetreat-v1.2.0.zip" class="download-btn">
+            <h2>Download RiftRetreat v2.0.0</h2>
+            <a href="https://github.com/GuusKooij/RiftRetreat/releases/download/v2.0.0/RiftRetreat-v2.0.0.zip" class="download-btn">
                 ⬇️ Download for Windows
             </a>
-            <p class="version-info">Windows 10/11 (64-bit) • 53 MB ZIP</p>
+            <p class="version-info">Windows 10/11 (64-bit) • 47 MB ZIP</p>
             <p style="color: #A09B8C; margin-top: 20px;">
                 Or view on <a href="https://github.com/GuusKooij/RiftRetreat">GitHub</a>
             </p>
         </div>
 
         <div class="features">
+            <div class="feature-card highlight">
+                <h3>🛠️ Build Creator <span class="new-tag">NEW</span></h3>
+                <p>Create and share Mobafire-style champion builds with runes, items, summoner spells, and skill order. Rich tooltips, drag-and-drop, and compressed export codes to share with friends.</p>
+            </div>
+            <div class="feature-card highlight">
+                <h3>🧠 Coaching Hub <span class="new-tag">NEW</span></h3>
+                <p>Combined Rank Predictor and Coaching Report. Predict your rank per role, simulate improvements with the What If Simulator, and get personalized coaching on vision, tilt, champion pool, and more.</p>
+            </div>
             <div class="feature-card">
                 <h3>📊 Performance Dashboard</h3>
                 <p>Track your stats, win rates, KDA, and performance trends across all champions and roles.</p>
@@ -133,18 +156,6 @@
                 <p>Monitor progress on 300+ League challenges with smart champion recommendations.</p>
             </div>
             <div class="feature-card">
-                <h3>🔮 Rank Predictor</h3>
-                <p>Context-aware predictions comparing your stats to your current rank's averages.</p>
-            </div>
-            <div class="feature-card">
-                <h3>🎲 Tilt Detection</h3>
-                <p>Detect losing streaks and find your optimal playing times with session analysis.</p>
-            </div>
-            <div class="feature-card">
-                <h3>📈 Ranked Climb Tracker</h3>
-                <p>Track LP history, session performance, and visualize your climb over time.</p>
-            </div>
-            <div class="feature-card">
                 <h3>🔴 Live Game Intel</h3>
                 <p>Champion select insights with matchup history, ban suggestions, counter-picks, and in-game scouting with rank lookups for all 10 players.</p>
             </div>
@@ -153,20 +164,24 @@
                 <p>Enemy matchup analysis with suggested bans, worst/best matchups, per-role breakdowns, and recurring opponent tracking.</p>
             </div>
             <div class="feature-card">
-                <h3>🔧 Item Builds</h3>
-                <p>Per-champion core item win rate analysis, first item comparisons, and boots analysis.</p>
-            </div>
-            <div class="feature-card">
                 <h3>👥 Friend Compare</h3>
                 <p>Side-by-side ranked comparison with any player — rank, win rate, and record for Solo/Duo and Flex.</p>
             </div>
             <div class="feature-card">
-                <h3>📋 Coaching Report</h3>
-                <p>Personalized improvement areas, tilt assessment, vision analysis, champion pool review, with HTML export.</p>
+                <h3>💀 Nuzlocke Mode</h3>
+                <p>Lose with a champion and they're eliminated. Earn resurrection tokens, track streaks, and compete in the ultimate challenge mode.</p>
             </div>
             <div class="feature-card">
-                <h3>🔮 What If Simulator</h3>
-                <p>Estimate games to reach a target rank and see how improving specific stats would change your predicted rank.</p>
+                <h3>📸 Stat Cards</h3>
+                <p>Generate shareable stat cards with your performance highlights, champion mastery, and ranked achievements.</p>
+            </div>
+            <div class="feature-card">
+                <h3>📈 Records &amp; Climb Tracker</h3>
+                <p>Personal records, LP history, session performance, and visualize your ranked climb over time.</p>
+            </div>
+            <div class="feature-card">
+                <h3>🎮 LeaguePlay</h3>
+                <p>Track custom tournament and clash games with friends in organized league-style play.</p>
             </div>
         </div>
 
